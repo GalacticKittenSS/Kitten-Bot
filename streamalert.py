@@ -31,7 +31,7 @@ async def checkstream(client):
     stream_viewers = values["stream"]["viewers"]
     channel_url = values["stream"]["channel"]["url"]
     channel_description = values["stream"]["channel"]["description"]
-    channel_image = values["stream"]["channel"]["logo"]
+    channel_image = "https://static-cdn.jtvnw.net/previews-ttv/live_user_galactickittenss-1920x1080.jpg"
 
     embed_text = discord.Embed(title=stream_title,colour=discord.Colour(0x8f43f0),url=channel_url,description=channel_description)
     embed_text.set_image(url=channel_image)

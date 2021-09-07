@@ -3,8 +3,9 @@ import datetime
 import calendar
 import random
 import itertools
+import json
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from awake import keep_alive
 from streamalert import checkstream
 import variable
@@ -143,11 +144,13 @@ async def on_member_remove(member):
 #ON CLIENT READY
 @client.event
 async def on_ready():
-	print("We have logged in as {0.user}".format(client))
-
-	await sortReact(client)
-
-	await checkstream.start(client)
+  print("We have logged in as {0.user}".format(client))
+  
+  await sortReact(client)
+  
+  videos.start()
+  
+  checkstream.start(client)
 
 #REACTIONS
 @client.event
@@ -377,6 +380,112 @@ async def say(ctx, *, text=''):
     else:
         await ctx.send(text)
         await ctx.message.delete()
+        
+@client.command()
+@commands.has_role("Moderator")
+async def vid(ctx, title, description, link, time):
+  await ctx.message.delete()
 
+
+  if time.split('-')[0] == "21" or time.split('-') == "1":
+    await ctx.channel.send(f"Added **{title}** to list of videos. It will release on the **{time.split('-')[0]}st** at **{time.split(' ')[1]} GMT**")
+
+  elif time.split('-')[0] == "22" or time.split('-') == "2":
+    await ctx.channel.send(f"Added **{title}** to list of videos. It will release on the **{time.split('-')[0]}nd** at **{time.split(' ')[1]} GMT**")
+
+  
+  elif time.split('-')[0] == "23" or time.split('-') == "3":
+    await ctx.channel.send(f"Added **{title}** to list of videos. It will release on the **{time.split('-')[0]}rd** at **{time.split(' ')[1]} GMT**")
+
+  else:
+    await ctx.channel.send(f"Added **{title}** to list of videos. It will release on the **{time.split('-')[0]}th** at **{time.split(' ')[1]} GMT**")
+
+  with open("videos.json", "r") as f:
+    vids = json.load(f)
+  
+  vids[title] = {}
+  vids[title]["Title"] = title
+  vids[title]["Description"] = description
+  vids[title]["Link"] = link
+  vids[title]["Time"] = time
+
+  with open("videos.json", "w") as f:
+    json.dump(vids, f, indent=2)
+
+@tasks.loop(seconds=60)
+async def videos():
+  with open("videos.json", "r") as f:
+    vids = json.load(f)
+
+  popped = ""
+
+  for video in vids:
+    vidTime = vids[video]["Time"]
+    
+    now = datetime.datetime.now().strftime("%d-%m %H:%M")
+
+    if vidTime == now:
+      popped = video
+      embed_text = discord.Embed(title=vids[video]["Title"],description=vids[video]["Description"], colour=discord.Colour(0x8f43f0),url=vids[video]["Link"])
+
+      embed_text.set_image(url=f"https://i.ytimg.com/vi/{vids[video]['Link'].split('/')[3]}/hqdefault.jpg")
+      embed_text.set_author(name="GalacticKittenSS")
+      embed_text.set_footer(text=datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
+      
+      await client.get_channel(variable.video_channel).send(content=f"**New Video! {client.get_guild(variable.guild_id).get_role(variable.react_roles[0]).mention}**", embed=embed_text)
+
+  try:
+    vids.pop(popped)
+  except:
+    pass
+
+  with open("videos.json", "w") as f:
+    json.dump(vids, f, indent=2)
+          
+@client.command()
+async def embed(ctx, *args):
+  await ctx.message.delete()
+
+  data = {}
+  data["channel"] = ctx.channel.id
+  data["message"] = " "
+  data["title"] = " "
+  data["description"] = " "
+
+  roles = []
+  for role in ctx.author.roles:
+    roles.append(role.name);
+
+  for value in args:
+    var, val = value.split("=")
+    if var != "channel":
+      data[var] = val
+    elif "Moderator" in roles:
+      print(roles)
+      data[var] = val
+
+  
+  try:
+    embed = discord.Embed(title= data["title"], description=data["description"], url=data["url"], colour=discord.Colour(0x8f43f0))
+  except:
+    embed = discord.Embed(title= data["title"], description=data["description"],colour=discord.Colour(0x8f43f0))
+  embed.set_author(name=ctx.author.name)
+  try:
+    embed.set_image(url=data["image"])
+  except:
+    pass
+  await client.get_channel(int(data["channel"]) ).send(data["message"], embed=embed)
+
+
+@client.command()
+async def vidClear(ctx):
+  with open("videos.json", "r") as f:
+    vids = json.load(f)
+
+  vids = {}
+
+  with open("videos.json", "w") as f:
+    json.dump(vids, f, indent=2)
+        
 keep_alive()
 client.run(os.getenv("DISCORD"))
