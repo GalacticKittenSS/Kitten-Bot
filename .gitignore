@@ -1,0 +1,5 @@
+/[Ss]ettings/
+/__pycache__/
+
+.breakpoints
+.env
