@@ -1,14 +1,15 @@
 [tool.poetry]
 name = "KittenBot"
-version = "1.2.0"
+version = "1.3.0"
 description = ""
 authors = ["GalacticKittenSS <@GalacticKitten>"]
 
 [tool.poetry.dependencies]
 python = "^3.8"
-Flask = "^2.0.3"
-google-api-python-client = "^2.39.0"
-"discord.py" = "^1.7.3"
+python-dotenv = "^0.21.0"
+Flask = "^2.2.0"
+google-api-python-client = "^2.62.0"
+"discord.py" = "^2.0.1"
 
 [tool.poetry.dev-dependencies]
 

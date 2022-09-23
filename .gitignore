@@ -1,5 +1,8 @@
-/[Ss]ettings/
-/__pycache__/
+Settings/
+Maps/
+venv/
+*/__pycache__/
 
 .breakpoints
 .env
+*.log
