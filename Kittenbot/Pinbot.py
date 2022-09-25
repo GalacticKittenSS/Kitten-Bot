@@ -1,6 +1,8 @@
 import discord.utils
 import Utils
 
+import Logger
+
 async def Pin(client, settings, payload):
   if payload.emoji.name != settings["Emoji"]:
     return
@@ -24,7 +26,8 @@ async def Pin(client, settings, payload):
       
     webhook = await client.get_channel(settings["Repost"]).create_webhook(
       name=message.author.name, 
-      avatar= await Utils.GetBytesFromUrl("https://cdn.discordapp.com/avatars/{0.id}/{0.avatar}.png?size=1024".format(message.author))
+      avatar=await Utils.GetBytesFromUrl(message.author.avatar.url),
+      reason=f"Message by {message.author.name} was pinned"
     )
     await webhook.send(
       content=message.content, 

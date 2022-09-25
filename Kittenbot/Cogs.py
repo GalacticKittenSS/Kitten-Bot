@@ -7,24 +7,24 @@ import datetime
 import calendar
 import json
 
+def CheckSettings(guild_id, command_name):
+  with open(f"Settings/{guild_id}.json", "r") as f:
+    settings = json.load(f)
+  return settings["Commands"][command_name]
+
 #-------------------------COMMANDS-------------------------
 class Commands(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
-  def CheckSettings(self, guild_id, command_name):
-    with open(f"Settings/{guild_id}.json", "r") as f:
-      settings = json.load(f)
-    return settings["Commands"][command_name]
-
   @commands.hybrid_command(help="Ping Me!")
   async def ping(self, ctx):
-    if self.CheckSettings(ctx.guild.id, "Ping"):
+    if CheckSettings(ctx.guild.id, "Ping"):
       await ctx.send(f"Pong: {round(Storage.Client.latency * 1000)}ms")
   
   @commands.hybrid_command(help="Whats Todays Date?")
   async def date(self, ctx):
-    if not self.CheckSettings(ctx.guild.id, "Date"):
+    if not CheckSettings(ctx.guild.id, "Date"):
       return
     
     dt = datetime.datetime.today()
@@ -37,7 +37,7 @@ class Commands(commands.Cog):
   #Shows Information about a User
   @commands.hybrid_command(help="Get member information", aliases=["whois"])
   async def who(self, ctx, user: discord.Member):
-    if not self.CheckSettings(ctx.guild.id, "Who"):
+    if not CheckSettings(ctx.guild.id, "Who"):
       return
     
     if user == None:
@@ -94,7 +94,7 @@ class Commands(commands.Cog):
 
   @commands.hybrid_command(help="Send Something in an embed!")
   async def embed(self, ctx, message, title, description = None, colour = 0x8f43f0, image = None, thumbnail = None):
-    if not self.CheckSettings(ctx.guild.id, "Embed"):
+    if not CheckSettings(ctx.guild.id, "Embed"):
       return
       
     if not description:
@@ -129,6 +129,9 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Gives/Removes a role")
   @commands.has_permissions(manage_roles=True)
   async def role(self, ctx, user: commands.MemberConverter, role: commands.RoleConverter):
+    if not CheckSettings(ctx.guild.id, "Role"):
+      return
+    
     context = "add"
     for value in user.roles:
       if value == role:
@@ -145,6 +148,9 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Deletes an amount of messages")
   @commands.has_permissions(manage_messages=True)
   async def clear(self, ctx, amount=5):
+    if not CheckSettings(ctx.guild.id, "Clear"):
+      return
+      
     await ctx.defer(ephemeral=True)
     await ctx.channel.purge(limit=amount)
     await ctx.reply(f"Cleared {amount} messages", ephemeral=True)
@@ -152,13 +158,21 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Deletes messages from user", aliases=["ClearFromUser" "cUser"])
   @commands.has_permissions(manage_messages=True)
   async def clearuser(self, ctx, user: commands.MemberConverter, *, amount=5):
+    if not CheckSettings(ctx.guild.id, "ClearUser"):
+      return
+    
     async for message in ctx.history(limit=amount):
       if message.author == user:
         await message.delete()
+        
+    await ctx.reply(f"Cleared messages from {user.mention} in last {amount}", ephemeral=True)
     
   @commands.hybrid_command(help="Kicks a Member")
   @commands.has_permissions(kick_members=True)
   async def kick(self, ctx, user: discord.Member, *, reason=None):
+    if not CheckSettings(ctx.guild.id, "Kick"):
+      return
+    
     if user == ctx.author:
       await ctx.send("You can't kick yourself, silly!")
       return
@@ -168,13 +182,16 @@ class Moderation(commands.Cog):
     if reason == None:
       reason = "Unknown"
     
-    await ctx.send(f"Kicked: {user.mention} for {reason}")
+    await ctx.reply(f"Kicked: {user.mention} for {reason}")
   
   @commands.hybrid_command(help="Bans a Member")
   @commands.has_permissions(ban_members=True)
   async def ban(self, ctx, user: discord.Member, *, reason=None):
+    if not CheckSettings(ctx.guild.id, "Ban"):
+      return
+      
     if user == ctx.author:
-      await ctx.send("You can't ban yourself, silly!")
+      await ctx.reply("You can't ban yourself, silly!")
       return
     
     await user.ban(reason=reason)
@@ -182,7 +199,7 @@ class Moderation(commands.Cog):
     if reason == None:
       reason = "Unknown"
       
-    await ctx.send(f"Banned: {user.mention} for {reason}")
+    await ctx.reply(f"Banned: {user.mention} for {reason}")
   
   @commands.hybrid_command(help="Unbans a User")
   @commands.has_permissions(ban_members=True)
@@ -195,7 +212,7 @@ class Moderation(commands.Cog):
       
       if (user.name, user.discriminator) == (name, discriminator):
         await ctx.guild.unban(user)
-        await ctx.channel.send(f"Unbanned: {user.mention}")
+        await ctx.reply(f"Unbanned: {user.mention}")
         break
   
   @commands.hybrid_command(help="Gets Ban List")
@@ -213,4 +230,4 @@ class Moderation(commands.Cog):
     
       message += "\n> User: " + entry.user.mention + "#" + entry.user.discriminator + ", Reason: `" + reason + "`"
     
-    await ctx.channel.send(content=message)
+    await ctx.reply(content=message)

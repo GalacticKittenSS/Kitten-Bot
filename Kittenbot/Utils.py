@@ -8,15 +8,6 @@ import io
 import aiohttp
 import discord
 
-async def GetFileFromUrl(my_url):
-  async with aiohttp.ClientSession() as session:
-    async with session.get(my_url) as resp:
-      if resp.status != 200:
-          return
-        
-      data = io.BytesIO(await resp.read())
-      return discord.File(data, my_url)
-
 async def GetBytesFromUrl(my_url):
   async with aiohttp.ClientSession() as session:
     async with session.get(my_url) as resp:
