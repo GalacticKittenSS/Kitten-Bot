@@ -7,9 +7,13 @@ import datetime
 import calendar
 import json
 
-def CheckSettings(guild_id, command_name):
-  with open(f"Settings/{guild_id}.json", "r") as f:
+async def CheckSettings(ctx, command_name):
+  with open(f"Settings/{ctx.guild.id}.json", "r") as f:
     settings = json.load(f)
+  
+  if not settings["Commands"][command_name]:
+    await ctx.reply("This Command is Disabled")
+
   return settings["Commands"][command_name]
 
 #-------------------------COMMANDS-------------------------
@@ -19,12 +23,12 @@ class Commands(commands.Cog):
 
   @commands.hybrid_command(help="Ping Me!")
   async def ping(self, ctx):
-    if CheckSettings(ctx.guild.id, "Ping"):
+    if await CheckSettings(ctx, "Ping"):
       await ctx.send(f"Pong: {round(Storage.Client.latency * 1000)}ms")
   
   @commands.hybrid_command(help="Whats Todays Date?")
   async def date(self, ctx):
-    if not CheckSettings(ctx.guild.id, "Date"):
+    if not await CheckSettings(ctx, "Date"):
       return
     
     dt = datetime.datetime.today()
@@ -37,11 +41,9 @@ class Commands(commands.Cog):
   #Shows Information about a User
   @commands.hybrid_command(help="Get member information", aliases=["whois"])
   async def who(self, ctx, user: discord.Member):
-    if not CheckSettings(ctx.guild.id, "Who"):
+    settings = await CheckSettings(ctx, "Who")
+    if not settings:
       return
-    
-    if user == None:
-      user = ctx.author
     
     if not settings["Colour"]:
         settings["Colour"] = 0x8f43f0
@@ -53,8 +55,8 @@ class Commands(commands.Cog):
       timestamp=datetime.datetime.now()
     ) 
     
-    embed.set_thumbnail(url="https://cdn.discordapp.com/avatars/{0.id}/{0.avatar}.png?size=1024".format(user))
-    embed.set_author(name=ctx.author.name, icon_url="https://cdn.discordapp.com/avatars/{0.id}/{0.avatar}.png?size=1024".format(ctx.author))
+    embed.set_thumbnail(url=user.avatar.url)
+    embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url)
 
     weekDays = ("Mon","Tues","Wed","Thur","Fri","Sat","Sun")
     
@@ -94,7 +96,7 @@ class Commands(commands.Cog):
 
   @commands.hybrid_command(help="Send Something in an embed!")
   async def embed(self, ctx, message, title, description = None, colour = 0x8f43f0, image = None, thumbnail = None):
-    if not CheckSettings(ctx.guild.id, "Embed"):
+    if not await CheckSettings(ctx, "Embed"):
       return
       
     if not description:
@@ -112,7 +114,7 @@ class Commands(commands.Cog):
     )
     
     if settings["Author"]:
-      embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar_url)
+      embed.set_author(name=ctx.author.name, icon_url=ctx.author.avatar.url)
     
     if image:
       embed.set_image(url=image)
@@ -129,7 +131,7 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Gives/Removes a role")
   @commands.has_permissions(manage_roles=True)
   async def role(self, ctx, user: commands.MemberConverter, role: commands.RoleConverter):
-    if not CheckSettings(ctx.guild.id, "Role"):
+    if not await CheckSettings(ctx, "Role"):
       return
     
     context = "add"
@@ -148,7 +150,7 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Deletes an amount of messages")
   @commands.has_permissions(manage_messages=True)
   async def clear(self, ctx, amount=5):
-    if not CheckSettings(ctx.guild.id, "Clear"):
+    if not await CheckSettings(ctx, "Clear"):
       return
       
     await ctx.defer(ephemeral=True)
@@ -158,7 +160,7 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Deletes messages from user", aliases=["ClearFromUser" "cUser"])
   @commands.has_permissions(manage_messages=True)
   async def clearuser(self, ctx, user: commands.MemberConverter, *, amount=5):
-    if not CheckSettings(ctx.guild.id, "ClearUser"):
+    if not await CheckSettings(ctx, "ClearUser"):
       return
     
     async for message in ctx.history(limit=amount):
@@ -170,7 +172,7 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Kicks a Member")
   @commands.has_permissions(kick_members=True)
   async def kick(self, ctx, user: discord.Member, *, reason=None):
-    if not CheckSettings(ctx.guild.id, "Kick"):
+    if not await CheckSettings(ctx, "Kick"):
       return
     
     if user == ctx.author:
@@ -187,7 +189,7 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Bans a Member")
   @commands.has_permissions(ban_members=True)
   async def ban(self, ctx, user: discord.Member, *, reason=None):
-    if not CheckSettings(ctx.guild.id, "Ban"):
+    if not await CheckSettings(ctx, "Ban"):
       return
       
     if user == ctx.author:
@@ -204,6 +206,9 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Unbans a User")
   @commands.has_permissions(ban_members=True)
   async def unban(self, ctx, user):
+    if not await CheckSettings(ctx, "Unban"):
+      return
+      
     banned = await ctx.guild.bans()
   
     name, discriminator = user.split('#')
@@ -218,6 +223,9 @@ class Moderation(commands.Cog):
   @commands.hybrid_command(help="Gets Ban List")
   @commands.has_permissions(ban_members=True)
   async def banned(self, ctx):
+    if not await CheckSettings(ctx, "Banned"):
+      return
+    
     banned = await ctx.guild.bans()
     if len(banned) == 0:
       return await ctx.send("No Banned User Found")
@@ -231,3 +239,94 @@ class Moderation(commands.Cog):
       message += "\n> User: " + entry.user.mention + "#" + entry.user.discriminator + ", Reason: `" + reason + "`"
     
     await ctx.reply(content=message)
+
+  #-------------------------Settings-------------------------
+  def ToggleCommandSettings(self, guild_id, command_name):
+    with open(f"Settings/{guild_id}.json", "r") as f:
+      settings = json.load(f)
+    
+    value = not bool(settings["Commands"][command_name])
+    
+    if value and command_name == "Who":
+      value = {}
+      value["Colour"] = 0
+      value["Account Created"] = True
+      value["Joined Server"] = True
+      value["Roles"] = True
+      value["Perms"] = True
+      value["Excluded Perms"] = [
+        "create_instant_invite", "add_reactions", "stream",
+        "read_messages", "send_messages", "read_message_history",
+        "embed_links", "attach_files",
+        "mention_everyone", "external_emojis", "change_nickname", 
+        "speak", "use_voice_activation", "connect", "request_to_speak"
+      ]
+    elif value and command_name == "Embed":
+      settings = {}
+      settings["Author"] = True
+      settings["Timestamp"] = True
+
+    settings["Commands"][command_name] = value
+
+    with open(f"Settings/{guild_id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+    
+    return bool(value)
+
+  async def SetCommandSettings(self, ctx, command_name, value):
+      with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+        settings = json.load(f)
+      
+      settings["Commands"][command_name] = value
+      
+      with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+        json.dump(settings, f, indent=2)
+      
+      await ctx.reply(f"Changed Settings for {command_name} to {value}") 
+
+  @commands.hybrid_group(help = "Settings for this guild")
+  @commands.has_permissions(administrator=True)
+  async def settings(self, ctx):
+    if ctx.invoked_subcommand is None:
+      return await ctx.reply('Invalid Command. Please use `!help Settings` for available commands')
+  
+  @settings.command(help="Enable/Disable a Command")
+  async def toggle(self, ctx, command : str):
+    try:
+      command = command.capitalize()
+      enabled = self.ToggleCommandSettings(ctx.guild.id, command)
+      await ctx.reply(f"{['Disabled', 'Enabled'][int(enabled)]} command {command}")
+    except KeyError:
+      await ctx.reply(f"Command with name {command} not found")
+
+  @settings.command(help="Adjust Settings for Command Who")
+  async def who(self, ctx, enabled : bool, colour : int = 0, 
+    account_created : bool = True, joined_server: bool = True,
+    roles: bool = True, perms: bool = True):
+    settings = enabled
+    if enabled:
+      settings = {}
+      settings["Colour"] = colour
+      settings["Account Created"] = account_created
+      settings["Joined Server"] = joined_server
+      settings["Roles"] = roles
+      settings["Perms"] = perms
+      settings["Excluded Perms"] = [
+        "create_instant_invite", "add_reactions", "stream",
+        "read_messages", "send_messages", "read_message_history",
+        "embed_links", "attach_files",
+        "mention_everyone", "external_emojis", "change_nickname", 
+        "speak", "use_voice_activation", "connect", "request_to_speak"
+      ]
+    
+    await self.SetCommandSettings(ctx, "Who", settings)
+
+  @settings.command(help="Adjust Settings for Command Embed")
+  async def embed(self, ctx, enabled : bool, author : bool = True, timestamp : bool = True):
+    settings = enabled
+    if enabled:
+      settings = {}
+      settings["Author"] = author
+      settings["Timestamp"] = timestamp
+
+    await self.SetCommandSettings(ctx, "Embed", settings)
