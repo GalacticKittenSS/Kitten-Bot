@@ -2,6 +2,7 @@ import discord
 from discord.ext import commands
 
 import Storage
+import Logger
 
 import datetime
 import calendar
@@ -273,11 +274,22 @@ class Moderation(commands.Cog):
     
     return bool(value)
 
-  async def SetCommandSettings(self, ctx, command_name, value):
+  async def ChangeCommandSettings(self, ctx, command_name, value):
       with open(f"Settings/{ctx.guild.id}.json", "r") as f:
         settings = json.load(f)
       
       settings["Commands"][command_name] = value
+      
+      with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+        json.dump(settings, f, indent=2)
+      
+      await ctx.reply(f"Changed Settings for {command_name} to {value}") 
+    
+  async def ChangeEventSettings(self, ctx, category, command_name, value):
+      with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+        settings = json.load(f)
+      
+      settings["Events"][category][command_name] = value
       
       with open(f"Settings/{ctx.guild.id}.json", "w") as f:
         json.dump(settings, f, indent=2)
@@ -319,7 +331,7 @@ class Moderation(commands.Cog):
         "speak", "use_voice_activation", "connect", "request_to_speak"
       ]
     
-    await self.SetCommandSettings(ctx, "Who", settings)
+    await self.ChangeCommandSettings(ctx, "Who", settings)
 
   @settings.command(help="Adjust Settings for Command Embed")
   async def embed(self, ctx, enabled : bool, author : bool = True, timestamp : bool = True):
@@ -329,4 +341,100 @@ class Moderation(commands.Cog):
       settings["Author"] = author
       settings["Timestamp"] = timestamp
 
-    await self.SetCommandSettings(ctx, "Embed", settings)
+    await self.ChangeCommandSettings(ctx, "Embed", settings)
+
+  @settings.command(help="Adjust Pinbot Settings")
+  async def pinbot(self, ctx, enabled : bool, 
+    emoji : str ="\ud83d\udccc", pins_needed : int = 5,
+    pin_to_channel : bool = True, repost_channel : discord.TextChannel = None):
+    settings = enabled
+    if enabled:
+      settings = {}
+      settings["Emoji"] = emoji
+      settings["Pins Needed"] = pins_needed
+      settings["Pin to Channel"] = pin_to_channel
+      if not repost_channel:
+        settings["Repost"] = 0
+      else:
+        settings["Repost"] = repost_channel.id
+      
+    await self.ChangeEventSettings(ctx, "On Reaction", "Pinbot", settings)
+
+  async def EditReactForRole(self, ctx, settings):
+    channel = Storage.Client.get_channel(settings["Channel"])
+    embed = discord.Embed(
+      title=settings["Title"],
+      colour=discord.Colour(settings["Colour"]), 
+      description=settings["Description"]
+    )
+    
+    for role in settings["Roles"]:
+      embed.add_field(name=ctx.guild.get_role(role["Role"]).name + " " + role["Emoji"], value=role["Message"], inline=True)
+    
+    try:
+      message = await channel.fetch_message(settings["MessageID"])
+      await message.edit(content=settings["Message"], embed=embed)
+    except discord.errors.NotFound:
+      message = await channel.send(content=settings["Message"], embed=embed)
+      settings["MessageID"] = message.id
+
+    for role in settings["Roles"]:
+      await message.add_reaction(role["Emoji"])
+
+  @settings.command(help="Adjust React for Role Settings")
+  async def react_for_role(self, ctx, enabled : bool,  channel : discord.TextChannel,
+    message : str = "", title : str = "", description : str = "", 
+    colour : int = 9389040):
+    settings = enabled
+    if enabled:
+      with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+        settings = json.load(f)["Events"]["On Reaction"]["React for Role"]
+        if not settings:
+          settings = {}
+      
+      settings["Channel"] = channel.id
+      settings["Title"] = title
+      settings["Description"] = description
+      settings["Message"] = message
+      settings["Colour"] = colour
+      if not colour:
+        settings["Colour"] = 0x8f43f0
+
+      await self.EditReactForRole(ctx, settings)
+      
+    await self.ChangeEventSettings(ctx, "On Reaction", "React for Role", settings)
+  
+  @settings.command()
+  async def add_react_role(self, ctx, role : discord.Role, emoji : str, message : str):
+    roleSettings = {}
+    roleSettings["Role"] = role.id
+    roleSettings["Emoji"] = emoji
+    roleSettings["Message"] = message
+
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)["Events"]["On Reaction"]["React for Role"]
+    
+    settings["Roles"].append(roleSettings)
+    await self.EditReactForRole(ctx, settings)
+    await self.ChangeEventSettings(ctx, "On Reaction", "React for Role", settings)
+
+  @settings.command()
+  async def remove_react_role(self, ctx, role : discord.Role):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)["Events"]["On Reaction"]["React for Role"]
+    
+    roleSettings = []
+    for r in settings["Roles"]:
+      if r["Role"] == role.id:
+        try:
+          channel = Storage.Client.get_channel(settings["Channel"])
+          message = await channel.fetch_message(settings["MessageID"])
+          await message.clear_reaction(r["Emoji"])
+        except:
+          Logger.Error("Unable to Remove Reaction")
+        continue
+      roleSettings.append(r)
+    settings["Roles"] = roleSettings
+    
+    await self.EditReactForRole(ctx, settings)
+    await self.ChangeEventSettings(ctx, "On Reaction", "React for Role", settings)
