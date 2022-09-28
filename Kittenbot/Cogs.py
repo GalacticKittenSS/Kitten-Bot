@@ -461,13 +461,10 @@ class Moderation(commands.Cog):
   
   @settings.command(help="Change Settings for Member Join")
   async def member_join(self, ctx, enabled : bool, channel : discord.TextChannel = None, roles : str = ""):
-    roles = roles.split(", ")
-    
     settings = enabled
     if enabled:
-      settings = {}
-      settings["Roles"] = roles
-      settings["Channel"] = 0
+      settings = { "Channel" : 0 }
+      settings["Roles"] = roles.split(", ")
       if channel:
         settings["Channel"] = channel.id
       
@@ -477,9 +474,57 @@ class Moderation(commands.Cog):
   async def member_leave(self, ctx, enabled : bool, channel : discord.TextChannel = None):
     settings = enabled
     if enabled:
-      settings = {}
-      settings["Channel"] = 0
+      settings = { "Channel" : 0 }
       if channel:
         settings["Channel"] = channel.id
 
     await self.ChangeEventSettings(ctx, "Member Leave", settings)
+
+  @settings.command(help="Change Settings for Stream Alert")
+  async def stream_alert(self, ctx, enabled : bool, channel : discord.TextChannel = None,
+    message : str = "", remove_offline : bool = True, colour : int =  0,
+    game : bool = True, viewers : bool = True,
+    image : bool = True, description : bool = True, author : bool = True):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      file = json.load(f)
+    
+    settings = enabled
+    if enabled:
+      settings = { "Channel" : 0 }
+      if channel:
+        settings["Channel"] = channel.id
+      settings["Message"] = message
+      settings["Remove Offline"] = remove_offline
+      settings["Colour"] = colour
+      settings["Users"] = file["Events"]["StreamAlert"]["Users"]
+      settings["Game"] = game
+      settings["Viewers"] = viewers
+      settings["Image"] = image
+      settings["Description"] = description
+      settings["Author"] = author
+
+    await self.ChangeEventSettings(ctx, "StreamAlert", settings)
+  
+  @settings.command(help="Change Settings for Stream Alert")
+  async def add_streamer(self, ctx, user : str):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)
+
+    settings["Events"]["StreamAlert"]["Users"].append(user)
+
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+
+    await ctx.reply(f"Added {user} from Streamer List")
+
+  @settings.command(help="Change Settings for Stream Alert")
+  async def remove_streamer(self, ctx, user : str):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)
+
+    settings["Events"]["StreamAlert"]["Users"].remove(user)
+
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+
+    await ctx.reply(f"Removed {user} from Streamer List")

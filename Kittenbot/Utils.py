@@ -1,12 +1,10 @@
-import json
-import urllib
 import os
+import requests
+
+import Storage
 
 from googleapiclient.discovery import build
-
-import io
 import aiohttp
-import discord
 
 async def GetBytesFromUrl(my_url):
   async with aiohttp.ClientSession() as session:
@@ -40,15 +38,10 @@ def MakeYoutubeSearchRequest(channel_id, last_checked_time):
   return response
 
 def MakeTwitchRequest(url):
-  request = urllib.request.Request(url)
-  request.add_header("Client-ID", os.getenv("Twitch Client"))
-  request.add_header("Authorization", "Bearer " + os.getenv("Twitch Token"))
-    
-  f = urllib.request.urlopen(request)
-  values = json.load(f)["data"]
-  f.close()
+  head = {
+    'Client-ID' : Storage.TwitchClient,
+    'Authorization' : "Bearer " + Storage.TwitchKey
+  }
 
-  if values:
-    return values
-  else:
-    return False
+  values = requests.get(url, headers=head).json()["data"]
+  return values

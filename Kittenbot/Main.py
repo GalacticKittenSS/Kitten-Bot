@@ -7,8 +7,9 @@ import Logger
 import Storage
 
 import CustomHelp
-import Pinbot
 import Cogs
+import Tasks
+import Pinbot
 
 import json
 
@@ -47,7 +48,7 @@ async def on_ready():
     
   Logger.Info("We have logged in as {0.user}".format(client))
   
-  #Tasks.Twitch(client)
+  Tasks.StreamAlert(client)
   #Tasks.Youtube(client, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
   
   for guild in client.guilds:
