@@ -3,23 +3,20 @@ import discord.utils
 from discord.ext import commands
 
 import Awake
-import Storage
-import Utils
 import Logger
+import Storage
 
 import CustomHelp
 import Pinbot
 import Cogs
 
-import os
 import json
-import datetime
 
 def guild_prefix(client, message):
   with open(f"Settings/{message.guild.id}.json", 'r') as f:
     settings = json.load(f)
   return settings["Prefix"]
-  
+
 #Client
 activity = discord.Game(name="Now Using discord.py 2.0", type=3)
 customHelp = CustomHelp.Help()
@@ -200,6 +197,7 @@ async def on_command_error(ctx, error):
     value= str(type(error)).replace("<class 'discord.ext.commands.", "").replace("'>", ""), inline=True
   )
   
+  Logger.Error(error)
   await ctx.send(embed=embed)
 
 @client.event

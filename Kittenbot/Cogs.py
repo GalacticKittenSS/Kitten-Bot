@@ -97,7 +97,8 @@ class Commands(commands.Cog):
 
   @commands.hybrid_command(help="Send Something in an embed!")
   async def embed(self, ctx, message, title, description = None, colour = 0x8f43f0, image = None, thumbnail = None):
-    if not await CheckSettings(ctx, "Embed"):
+    settings = await CheckSettings(ctx, "Embed")
+    if not settings:
       return
       
     if not description:
@@ -227,19 +228,16 @@ class Moderation(commands.Cog):
     if not await CheckSettings(ctx, "Banned"):
       return
     
-    banned = await ctx.guild.bans()
-    if len(banned) == 0:
-      return await ctx.send("No Banned User Found")
-      
-    message = "Currently Banned Users:"
-    for entry in banned:
+    message, number = "", 0
+    async for entry in ctx.guild.bans(limit=150):
       reason = entry.reason
-      if reason == None:
+      if reason is None:
         reason = "Unknown"
-    
-      message += "\n> User: " + entry.user.mention + "#" + entry.user.discriminator + ", Reason: `" + reason + "`"
-    
-    await ctx.reply(content=message)
+
+      number += 1
+      message += f"\n> User: {entry.user.mention}#{entry.user.discriminator}, Reason: `{reason}`"
+      
+    await ctx.reply(f"Found {number} Banned Users\n{message}")
 
   #-------------------------Settings-------------------------
   def ToggleCommandSettings(self, guild_id, command_name):
@@ -249,24 +247,21 @@ class Moderation(commands.Cog):
     value = not bool(settings["Commands"][command_name])
     
     if value and command_name == "Who":
-      value = {}
-      value["Colour"] = 0
-      value["Account Created"] = True
-      value["Joined Server"] = True
-      value["Roles"] = True
-      value["Perms"] = True
-      value["Excluded Perms"] = [
-        "create_instant_invite", "add_reactions", "stream",
-        "read_messages", "send_messages", "read_message_history",
-        "embed_links", "attach_files",
-        "mention_everyone", "external_emojis", "change_nickname", 
-        "speak", "use_voice_activation", "connect", "request_to_speak"
-      ]
+      value = {
+        "Colour": 0,
+        "Account Created": True, "Joined Server": True,
+        "Roles": True, "Perms": True,
+        "Excluded Perms": [
+          "create_instant_invite", "add_reactions", "stream",
+          "read_messages", "send_messages", "read_message_history",
+          "embed_links", "attach_files",
+          "mention_everyone", "external_emojis", "change_nickname", 
+          "speak", "use_voice_activation", "connect", "request_to_speak"
+        ]
+      }
     elif value and command_name == "Embed":
-      settings = {}
-      settings["Author"] = True
-      settings["Timestamp"] = True
-
+      value = { "Author" : True, "Timestamp" : True}
+    
     settings["Commands"][command_name] = value
 
     with open(f"Settings/{guild_id}.json", "w") as f:
@@ -285,16 +280,27 @@ class Moderation(commands.Cog):
       
       await ctx.reply(f"Changed Settings for {command_name} to {value}") 
     
-  async def ChangeEventSettings(self, ctx, category, command_name, value):
+  async def ChangeReactionSettings(self, ctx, category, value):
       with open(f"Settings/{ctx.guild.id}.json", "r") as f:
         settings = json.load(f)
       
-      settings["Events"][category][command_name] = value
+      settings["Events"]["On Reaction"][category] = value
       
       with open(f"Settings/{ctx.guild.id}.json", "w") as f:
         json.dump(settings, f, indent=2)
       
-      await ctx.reply(f"Changed Settings for {command_name} to {value}") 
+      await ctx.reply(f"Changed Settings for {category} to {value}") 
+  
+  async def ChangeEventSettings(self, ctx, category, value):
+      with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+        settings = json.load(f)
+      
+      settings["Events"][category] = value
+      
+      with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+        json.dump(settings, f, indent=2)
+      
+      await ctx.reply(f"Changed Settings for {category} to {value}") 
 
   @commands.hybrid_group(help = "Settings for this guild")
   @commands.has_permissions(administrator=True)
@@ -303,7 +309,7 @@ class Moderation(commands.Cog):
       return await ctx.reply('Invalid Command. Please use `!help Settings` for available commands')
   
   @settings.command(help="Enable/Disable a Command")
-  async def toggle(self, ctx, command : str):
+  async def toggle_command(self, ctx, command : str):
     try:
       command = command.capitalize()
       enabled = self.ToggleCommandSettings(ctx.guild.id, command)
@@ -358,7 +364,7 @@ class Moderation(commands.Cog):
       else:
         settings["Repost"] = repost_channel.id
       
-    await self.ChangeEventSettings(ctx, "On Reaction", "Pinbot", settings)
+    await self.ChangeReactionSettings(ctx, "Pinbot", settings)
 
   async def EditReactForRole(self, ctx, settings):
     channel = Storage.Client.get_channel(settings["Channel"])
@@ -402,9 +408,9 @@ class Moderation(commands.Cog):
 
       await self.EditReactForRole(ctx, settings)
       
-    await self.ChangeEventSettings(ctx, "On Reaction", "React for Role", settings)
+    await self.ChangeReactionSettings(ctx, "React for Role", settings)
   
-  @settings.command()
+  @settings.command(help="Add Role from React for Role")
   async def add_react_role(self, ctx, role : discord.Role, emoji : str, message : str):
     roleSettings = {}
     roleSettings["Role"] = role.id
@@ -416,9 +422,9 @@ class Moderation(commands.Cog):
     
     settings["Roles"].append(roleSettings)
     await self.EditReactForRole(ctx, settings)
-    await self.ChangeEventSettings(ctx, "On Reaction", "React for Role", settings)
+    await self.ChangeReactionSettings(ctx, "React for Role", settings)
 
-  @settings.command()
+  @settings.command(help="Remove Role from React for Role")
   async def remove_react_role(self, ctx, role : discord.Role):
     with open(f"Settings/{ctx.guild.id}.json", "r") as f:
       settings = json.load(f)["Events"]["On Reaction"]["React for Role"]
@@ -437,4 +443,43 @@ class Moderation(commands.Cog):
     settings["Roles"] = roleSettings
     
     await self.EditReactForRole(ctx, settings)
-    await self.ChangeEventSettings(ctx, "On Reaction", "React for Role", settings)
+    await self.ChangeReactionSettings(ctx, "React for Role", settings)
+  
+  @settings.command(help="Remove Role from React for Role")
+  async def change(self, ctx, prefix, roles):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)
+
+    roles = roles.split(", ")
+    settings["Prefix"] = prefix
+    settings["Moderator Roles"] = roles
+    
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+
+    await ctx.reply(f"Changed Prefix to {prefix} and Roles to {roles}")
+  
+  @settings.command(help="Change Settings for Member Join")
+  async def member_join(self, ctx, enabled : bool, channel : discord.TextChannel = None, roles : str = ""):
+    roles = roles.split(", ")
+    
+    settings = enabled
+    if enabled:
+      settings = {}
+      settings["Roles"] = roles
+      settings["Channel"] = 0
+      if channel:
+        settings["Channel"] = channel.id
+      
+    await self.ChangeEventSettings(ctx, "Member Join", settings)
+
+  @settings.command(help="Change Settings for Member Leave")
+  async def member_leave(self, ctx, enabled : bool, channel : discord.TextChannel = None):
+    settings = enabled
+    if enabled:
+      settings = {}
+      settings["Channel"] = 0
+      if channel:
+        settings["Channel"] = channel.id
+
+    await self.ChangeEventSettings(ctx, "Member Leave", settings)
