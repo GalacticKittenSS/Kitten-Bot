@@ -35,7 +35,7 @@ async def on_ready():
     filelevel = Logger.DEBUG,
     fmt = "[%(asctime)s] [%(levelname)s] %(message)s",
     datefmt = "%Y-%m-%d %H:%M:%S",
-    filename = "Leaderboards.log"
+    filename = "Kittenbot.log"
   )
 
   await client.add_cog(Cogs.Commands(client))
