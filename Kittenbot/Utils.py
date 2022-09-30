@@ -17,5 +17,5 @@ def MakeTwitchRequest(url):
     'Authorization' : "Bearer " + Storage.TwitchKey
   }
 
-  values = requests.get(url, headers=head).json()["data"]
-  return values
+  result = requests.get(url, headers=head).json()
+  return result["data"]

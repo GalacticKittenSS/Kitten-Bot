@@ -122,7 +122,7 @@ async def on_member_remove(member):
 #Reaction Add
 @client.event
 async def on_raw_reaction_add(payload):
-  with open(f"Settings/{member.guild.id}.json", "r") as f:
+  with open(f"Settings/{payload.guild_id}.json", "r") as f:
     settings = json.load(f)["Events"]["On Reaction"]
   
   if not settings:
@@ -155,7 +155,7 @@ async def on_raw_reaction_add(payload):
 #Reaction Remove
 @client.event
 async def on_raw_reaction_remove(payload):
-  with open(f"Settings/{member.guild.id}.json", "r") as f:
+  with open(f"Settings/{payload.guild_id}.json", "r") as f:
     settings = json.load(f)["Events"]["On Reaction"]
   
   if not settings:

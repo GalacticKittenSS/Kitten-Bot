@@ -46,20 +46,19 @@ class StreamAlert:
     
   async def alert(self, values, channel, settings):
     channel_name = values["user_name"]
+    channel_login = values['user_login']
     stream_title = values["title"]
     stream_game = values["game_name"]
     stream_viewers = values["viewer_count"]
     stream_thumbnail = values["thumbnail_url"].replace("{width}x{height}", "1920x1080")
   
-    
-    values = Utils.MakeTwitchRequest("https://api.twitch.tv/helix/users?login=" + channel_name)[0]
-    channel_url = "https://twitch.tv/" + values["display_name"]
+    values = Utils.MakeTwitchRequest("https://api.twitch.tv/helix/users?login=" + channel_login)[0]
+    channel_url = "https://twitch.tv/" + channel_login
     channel_image = values["profile_image_url"]
     
+    channel_description = None
     if settings["Description"]:
       channel_description = values["description"]
-    else:
-      channel_description = discord.Embed.Empty
     
     if not settings["Colour"]:
       settings["Colour"] = 0x8f43f0

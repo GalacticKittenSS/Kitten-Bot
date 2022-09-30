@@ -1,0 +1,58 @@
+{
+  "Prefix": "!",
+  "Events": {
+    "Member Join": false,
+    "Member Leave": false,
+    "On Reaction": {
+      "Pinbot": {
+        "Emoji": "\ud83d\udccc",
+        "Pins Needed": 0,
+        "Pin to Channel": true,
+        "Repost": 0
+      },
+      "React for Role": false
+    },
+    "StreamAlert": false,
+    "VideoAlert": false
+  },
+  "Commands": {
+    "Who": {
+      "Colour": 0,
+      "Account Created": true,
+      "Joined Server": true,
+      "Roles": true,
+      "Perms": true,
+      "Excluded Perms": [
+        "create_instant_invite",
+        "add_reactions",
+        "stream",
+        "read_messages",
+        "send_messages",
+        "embed_links",
+        "attach_files",
+        "read_message_history",
+        "mention_everyone",
+        "external_emojis",
+        "connect",
+        "speak",
+        "use_voice_activation",
+        "change_nickname",
+        "request_to_speak"
+      ]
+    },
+    "Ping": true,
+    "Date": true,
+    "Embed": {
+      "Author": true,
+      "Timestamp": true
+    },
+    "Role": true,
+    "Clear": true,
+    "ClearUser": true,
+    "Kick": true,
+    "Ban": true,
+    "Unban": true,
+    "Banned": true
+  },
+  "Custom Events": []
+}

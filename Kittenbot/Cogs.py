@@ -100,11 +100,8 @@ class Commands(commands.Cog):
     settings = await CheckSettings(ctx, "Embed")
     if not settings:
       return
-      
-    if not description:
-      description = discord.Embed.Empty
     
-    timestamp = discord.Embed.Empty
+    timestamp = None
     if settings["Timestamp"]:
       timestamp = datetime.datetime.now()
     
@@ -255,10 +252,10 @@ class Moderation(commands.Cog):
     index = len(settings["Custom Events"]) + 1
 
     Embed = discord.Embed(title=name,description=description)
-    Embed.set_footer(text=f"Event stored at Index {index}")
+    Embed.set_footer(text=f"Event stored at Index {index - 1}")
 
     message = await ctx.send(content="New Event!", embed=Embed) 
-    settings["Custom Events"].insert(index, message.id)
+    settings["Custom Events"].append(message.id)
     
     with open(f"Settings/{ctx.guild.id}.json", "w") as f:
       json.dump(settings, f, indent = 2)
@@ -266,13 +263,17 @@ class Moderation(commands.Cog):
   @event.command(help= "Start an event at index")
   async def start(self, ctx, index : int, winners : int, role : discord.Role = None):
     settings = self.GetEventSettings(ctx.guild.id)["Custom Events"]
+    if len(settings) < index:
+      await ctx.reply("Index out of range")
+      return
+    
     message = await ctx.fetch_message(settings[index])
     users = [user for reaction in message.reactions async for user in reaction.users()]
-    
-    await ctx.reply("Picking Winners:")
-
     if not users:
+      await ctx.reply("No Winners found")
       return
+
+    await ctx.reply("Picking Winners:")
 
     all_winners = []
     for i in range(winners):
@@ -522,18 +523,16 @@ class Moderation(commands.Cog):
     await self.ChangeReactionSettings(ctx, "React for Role", settings)
   
   @settings.command(help="Remove Role from React for Role")
-  async def change(self, ctx, prefix, roles):
+  async def prefix(self, ctx, prefix):
     with open(f"Settings/{ctx.guild.id}.json", "r") as f:
       settings = json.load(f)
 
-    roles = roles.split(", ")
     settings["Prefix"] = prefix
-    settings["Moderator Roles"] = roles
     
     with open(f"Settings/{ctx.guild.id}.json", "w") as f:
       json.dump(settings, f, indent=2)
 
-    await ctx.reply(f"Changed Prefix to {prefix} and Roles to {roles}")
+    await ctx.reply(f"Changed Prefix to {prefix}")
   
   @settings.command(help="Change Settings for Member Join")
   async def member_join(self, ctx, enabled : bool, channel : discord.TextChannel = None):
