@@ -23,6 +23,7 @@ activity = discord.Game(name="Now Using discord.py 2.0", type=3)
 customHelp = CustomHelp.Help()
 intents = discord.Intents.default()
 intents.message_content = True
+intents.members = True
 
 client = commands.Bot(command_prefix=(guild_prefix), intents=intents, help_command=customHelp, activity=activity, status=discord.Status.online)
 client.sync_tree = False #Only sync if changes have been made to hybrid commands 
@@ -49,7 +50,6 @@ async def on_ready():
   Logger.Info("We have logged in as {0.user}".format(client))
   
   Tasks.StreamAlert(client)
-  #Tasks.Youtube(client, datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%SZ'))
   
   for guild in client.guilds:
     with open(f"Settings/{guild.id}.json", "r") as f:
@@ -89,7 +89,9 @@ async def on_ready():
 #Join
 @client.event
 async def on_member_join(member):
-  settings = json.load(open(f"Settings/{member.guild.id}.json", "r"))["Events"]["Member Join"]
+  with open(f"Settings/{member.guild.id}.json", "r") as f:
+    settings = json.load(f)["Events"]["Member Join"]
+  
   if not settings:
     return
 
@@ -98,16 +100,20 @@ async def on_member_join(member):
   await channel.send(message)
   
   for r in settings["Roles"]:
-    role = discord.utils.get(member.guild.roles, id=r)
+    role = member.guild.get_role(int(r))
+    if not role:
+      Logger.Info(f"Role with id {r} not found")
     await member.add_roles(role)
 
 #Leave
 @client.event
 async def on_member_remove(member):
-  settings = json.load(open(f"Settings/{member.guild.id}.json", "r"))["Events"]["Member Leave"]
+  with open(f"Settings/{member.guild.id}.json", "r") as f:
+    settings = json.load(f)["Events"]["Member Join"]
+  
   if not settings:
     return
-  
+
   channel = client.get_channel(settings["Channel"])
   message = f"{member.mention} has left **{member.guild.name}**. We're sad to see you go"
   
@@ -116,7 +122,9 @@ async def on_member_remove(member):
 #Reaction Add
 @client.event
 async def on_raw_reaction_add(payload):
-  settings = json.load(open(f"Settings/{payload.guild_id}.json", "r"))["Events"]["On Reaction"]
+  with open(f"Settings/{member.guild.id}.json", "r") as f:
+    settings = json.load(f)["Events"]["On Reaction"]
+  
   if not settings:
     return
 
@@ -147,7 +155,9 @@ async def on_raw_reaction_add(payload):
 #Reaction Remove
 @client.event
 async def on_raw_reaction_remove(payload):
-  settings = json.load(open(f"Settings/{payload.guild_id}.json", "r"))["Events"]["On Reaction"]
+  with open(f"Settings/{member.guild.id}.json", "r") as f:
+    settings = json.load(f)["Events"]["On Reaction"]
+  
   if not settings:
     return
 

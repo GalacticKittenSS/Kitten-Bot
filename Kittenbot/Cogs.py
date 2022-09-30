@@ -156,21 +156,21 @@ class Moderation(commands.Cog):
       return
       
     await ctx.defer(ephemeral=True)
+    await ctx.reply(f"Clearing {amount} messages", ephemeral=True)
     await ctx.channel.purge(limit=amount)
-    await ctx.reply(f"Cleared {amount} messages", ephemeral=True)
 
   @commands.hybrid_command(help="Deletes messages from user", aliases=["ClearFromUser" "cUser"])
   @commands.has_permissions(manage_messages=True)
-  async def clearuser(self, ctx, user: commands.MemberConverter, *, amount=5):
+  async def clearuser(self, ctx, user: discord.Member, *, amount=5):
     if not await CheckSettings(ctx, "ClearUser"):
       return
+    
+    await ctx.reply(f"Clearing messages from {user.mention} in last {amount}", ephemeral=True)
     
     async for message in ctx.history(limit=amount):
       if message.author == user:
         await message.delete()
-        
-    await ctx.reply(f"Cleared messages from {user.mention} in last {amount}", ephemeral=True)
-    
+  
   @commands.hybrid_command(help="Kicks a Member")
   @commands.has_permissions(kick_members=True)
   async def kick(self, ctx, user: discord.Member, *, reason=None):
@@ -210,11 +210,9 @@ class Moderation(commands.Cog):
   async def unban(self, ctx, user):
     if not await CheckSettings(ctx, "Unban"):
       return
-      
-    banned = await ctx.guild.bans()
-  
+    
     name, discriminator = user.split('#')
-    for entry in banned:
+    async for entry in ctx.guild.bans(limit=150):
       user = entry.user
       
       if (user.name, user.discriminator) == (name, discriminator):
@@ -538,15 +536,42 @@ class Moderation(commands.Cog):
     await ctx.reply(f"Changed Prefix to {prefix} and Roles to {roles}")
   
   @settings.command(help="Change Settings for Member Join")
-  async def member_join(self, ctx, enabled : bool, channel : discord.TextChannel = None, roles : str = ""):
+  async def member_join(self, ctx, enabled : bool, channel : discord.TextChannel = None):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      file = json.load(f)["Events"]["Member Join"]
+    
     settings = enabled
     if enabled:
       settings = { "Channel" : 0 }
-      settings["Roles"] = roles.split(", ")
+      settings["Roles"] = file["Roles"]
       if channel:
         settings["Channel"] = channel.id
-      
+    
     await self.ChangeEventSettings(ctx, "Member Join", settings)
+  
+  @settings.command(help="Add Role to Member when Joining")
+  async def add_default_role(self, ctx, role : discord.Role):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)
+
+    settings["Events"]["Member Join"]["Roles"].append(role.id)
+
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+
+    await ctx.reply(f"Added {role.mention} to Default Roles")
+
+  @settings.command(help="Remove Role from Member when Joining")
+  async def remove_default_role(self, ctx, role : discord.Role):
+    with open(f"Settings/{ctx.guild.id}.json", "r") as f:
+      settings = json.load(f)
+
+    settings["Events"]["Member Join"]["Roles"].remove(role.id)
+
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+
+    await ctx.reply(f"Removed {role.mention} from Default Roles")
 
   @settings.command(help="Change Settings for Member Leave")
   async def member_leave(self, ctx, enabled : bool, channel : discord.TextChannel = None):
