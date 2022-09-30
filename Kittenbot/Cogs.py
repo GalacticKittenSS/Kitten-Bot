@@ -1,11 +1,11 @@
 import discord
 from discord.ext import commands
 
-import Storage
 import Logger
 
 import datetime
 import calendar
+import random
 import json
 
 async def CheckSettings(ctx, command_name):
@@ -25,7 +25,7 @@ class Commands(commands.Cog):
   @commands.hybrid_command(help="Ping Me!")
   async def ping(self, ctx):
     if await CheckSettings(ctx, "Ping"):
-      await ctx.send(f"Pong: {round(Storage.Client.latency * 1000)}ms")
+      await ctx.send(f"Pong: {round(self.bot.latency * 1000)}ms")
   
   @commands.hybrid_command(help="Whats Todays Date?")
   async def date(self, ctx):
@@ -238,6 +238,84 @@ class Moderation(commands.Cog):
       message += f"\n> User: {entry.user.mention}#{entry.user.discriminator}, Reason: `{reason}`"
       
     await ctx.reply(f"Found {number} Banned Users\n{message}")
+  
+  #-------------------------Events-------------------------
+  def GetEventSettings(self, guild_id):
+    with open(f"Settings/{guild_id}.json", "r") as f:
+      settings = json.load(f)
+    return settings
+
+  @commands.hybrid_group(help = "Settings for this guild")
+  @commands.has_permissions(manage_events=True)
+  async def event(self, ctx):
+    if ctx.invoked_subcommand is None:
+      return await ctx.reply('Invalid Command. Please use `!help event` for available commands')
+
+  @event.command(help="Create an event at index")
+  async def create(self, ctx, name, colour = 0x8f43f0, description : str = "No description available"):
+    settings = self.GetEventSettings(ctx.guild.id)
+    index = len(settings["Custom Events"]) + 1
+
+    Embed = discord.Embed(title=name,description=description)
+    Embed.set_footer(text=f"Event stored at Index {index}")
+
+    message = await ctx.send(content="New Event!", embed=Embed) 
+    settings["Custom Events"].insert(index, message.id)
+    
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent = 2)
+  
+  @event.command(help= "Start an event at index")
+  async def start(self, ctx, index : int, winners : int, role : discord.Role = None):
+    settings = self.GetEventSettings(ctx.guild.id)["Custom Events"]
+    message = await ctx.fetch_message(settings[index])
+    users = [user for reaction in message.reactions async for user in reaction.users()]
+    
+    await ctx.reply("Picking Winners:")
+
+    if not users:
+      return
+
+    all_winners = []
+    for i in range(winners):
+      winner = random.choice(users)
+      if winner in all_winners:
+        i -= 1
+        continue
+      
+      if role:
+        await winner.add_roles(role)
+        
+      await ctx.send(f'{winner.mention} has been selected for the event')
+      all_winners.append(winner)
+
+  @event.command(help= "Delete an event at Index")
+  @commands.has_role('Moderators')
+  async def delete(self, ctx, index : int = -1):
+    settings = self.GetEventSettings(ctx.guild.id)
+    
+    if index < 0:
+      for msg in settings["Custom Events"]:
+        message = await ctx.fetch_message(msg)
+        await message.delete()
+      
+      settings["Custom Events"] = []
+      return
+    
+    message = await ctx.fetch_message(settings["Custom Events"][index])
+    await message.delete()
+    settings["Custom Events"].pop(index)
+
+    for i in range(len(settings["Custom Events"])):
+      msg = await ctx.fetch_message(settings["Custom Events"][i])
+      embed = msg.embeds[0]
+      embed.set_footer(text=f"Event stored at Index {i}")
+      await msg.edit(content=msg.content, embed=embed)
+
+    with open(f"Settings/{ctx.guild.id}.json", "w") as f:
+      json.dump(settings, f, indent=2)
+    
+    await ctx.reply("Deleted Event", ephemeral=True)
 
   #-------------------------Settings-------------------------
   def ToggleCommandSettings(self, guild_id, command_name):
@@ -367,7 +445,7 @@ class Moderation(commands.Cog):
     await self.ChangeReactionSettings(ctx, "Pinbot", settings)
 
   async def EditReactForRole(self, ctx, settings):
-    channel = Storage.Client.get_channel(settings["Channel"])
+    channel = self.bot.get_channel(settings["Channel"])
     embed = discord.Embed(
       title=settings["Title"],
       colour=discord.Colour(settings["Colour"]), 
@@ -433,7 +511,7 @@ class Moderation(commands.Cog):
     for r in settings["Roles"]:
       if r["Role"] == role.id:
         try:
-          channel = Storage.Client.get_channel(settings["Channel"])
+          channel = self.bot.get_channel(settings["Channel"])
           message = await channel.fetch_message(settings["MessageID"])
           await message.clear_reaction(r["Emoji"])
         except:
